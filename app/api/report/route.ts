@@ -1,12 +1,26 @@
 import { NextResponse } from "next/server";
 import supabase from "@/lib/supabaseServer";
 import { geminiModel } from "@/lib/gemini";
+import { currentUser } from "@clerk/nextjs/server"; // 👈 NEW
 
 export const runtime = "nodejs"; // use Node runtime for Buffer
 
 export async function POST(req: Request) {
   try {
     console.log("\n🟢 [API] /api/report called");
+
+    // 🔐 Get the current Clerk user
+    const user = await currentUser();
+    if (!user) {
+      console.warn("⚠️ No user found (not authenticated)");
+      return NextResponse.json(
+        { error: "Not authenticated" },
+        { status: 401 }
+      );
+    }
+
+    const userId = user.id; // 👈 this will go into Supabase as user_id
+    console.log("👤 Authenticated Clerk userId:", userId);
 
     // 1️⃣ Parse FormData
     const formData = await req.formData();
@@ -107,6 +121,7 @@ ${imageTextSnippets.join("\n\n---\n\n")}`
         raw_input: combinedNotes,
         report_content: aiText,
         style,
+        user_id: userId, // 👈 tie report to this Clerk user
       })
       .select()
       .single();
@@ -119,7 +134,7 @@ ${imageTextSnippets.join("\n\n---\n\n")}`
       );
     }
 
-    console.log("✅ Report saved successfully:", data.id || data);
+    console.log("✅ Report saved successfully:", (data as any).id || data);
 
     return NextResponse.json({ report: data });
   } catch (err) {

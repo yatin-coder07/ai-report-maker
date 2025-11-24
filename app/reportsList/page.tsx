@@ -2,6 +2,7 @@
 
 import supabase from "@/lib/supabaseServer";
 import ReportsListClient from "./ReportsListClient";
+import { currentUser } from "@clerk/nextjs/server"; // 👈 NEW
 
 type ReportRow = {
   id: string; // we won't *use* it in logic, just needed for key
@@ -13,9 +14,26 @@ type ReportRow = {
 };
 
 export default async function Page() {
+  // 🔐 Get the logged-in Clerk user
+  const user = await currentUser();
+
+  if (!user) {
+    return (
+      <main className="px-4 pt-24 pb-16 flex justify-center">
+        <p className="text-sm text-muted-foreground">
+          Please sign in to view your reports.
+        </p>
+      </main>
+    );
+  }
+
+  // 🔑 This is what we saved as user_id in /api/report
+  const userId = user.id;
+
   const { data, error } = await supabase
     .from("reports")
     .select("id, title, style, created_at, raw_input, report_content")
+    .eq("user_id", userId) // 👈 filter by THIS user only
     .order("created_at", { ascending: false });
 
   if (error) {
